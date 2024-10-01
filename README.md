@@ -33,99 +33,86 @@ The application works by locating browser data directories, decrypting stored se
 
 We encountered several problems during the process of cross-compiling the application for Windows while working on a Linux environment. Here are the steps we took to resolve these issues:
 
-### 1. **Initial Setup Issues**
-   At first, the project was set up to work primarily on Windows using the `windows` crate, which relies on Windows APIs such as `CryptUnprotectData`. However, compiling it on Linux led to issues with missing Windows-specific dependencies.
+### 1. **Initial Setup and Script**
 
-#### Solution:
-We installed the following libraries and made the necessary adjustments for cross-compiling:
-   - **GCC for Windows cross-compilation**:
-     ```bash
-     sudo apt-get install gcc-mingw-w64
-     ```
+We have created a Bash script called `setup_dependencies.sh` to ensure all necessary dependencies and configurations are handled, from installing system libraries, setting up Rust and Cargo, to configuring SSH for GitHub access.
 
-   - **Installing Rust and Required Target**:
-     ```bash
-     rustup target add x86_64-pc-windows-gnu
-     ```
+To run the setup, simply execute the script:
 
-   - **Windows API Crates**: We switched from the `windows` crate to `windows-sys`, which is better suited for cross-compilation due to its lower-level bindings.
+```bash
+chmod +x setup_dependencies.sh
+./setup_dependencies.sh
+```
 
-### 2. **Problems with Importing Windows APIs**
-   - We encountered errors such as unresolved imports for `CryptUnprotectData`, `DATA_BLOB`, and `LocalFree` due to incorrect crate usage and missing feature flags.
-   
-#### Solution:
-   - **Fixing Import Errors**:
-     We switched to using `windows-sys` for accessing Windows APIs and enabled the necessary feature flags in `Cargo.toml`:
-   
-   ```toml
-   [dependencies]
-   windows-sys = { version = "0.59.0", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory"] }
-   serde_json = "1.0.128"
-   base64 = "0.22.1"
-   hex = "0.4.3"
-   ```
+The script performs the following:
 
-   This fixed the import errors related to missing `DATA_BLOB` and `LocalFree`.
+1. **Rust & Cargo**: Installs Rust and Cargo, the Rust build system.
+2. **Target Setup**: Installs the necessary `x86_64-pc-windows-gnu` target for Windows cross-compilation.
+3. **System Libraries**:
+   - Installs `gcc-mingw-w64` for cross-compilation to Windows.
+   - Installs `wine` (optional) for running Windows binaries on Linux.
+4. **SSH Key Setup**: Ensures an SSH key is generated and added to the SSH agent for GitHub usage.
+5. **Switch Git Remote to SSH**: Updates the Git remote URL to use SSH instead of HTTPS for smoother authentication.
 
-### 3. **Casting and Memory Management Issues**
-   During the decryption process, we encountered casting issues when passing pointers of `DATA_BLOB` and memory management problems.
+### 2. **Manual Dependency Installation (If Needed)**
 
-#### Solution:
-   - **Type Alias for `DATA_BLOB`**: We resolved the casting issue by defining a type alias `DataBlob` for `CRYPT_INTEGER_BLOB`, which is a part of the Windows API:
-   
-   ```rust
-   type DataBlob = CRYPT_INTEGER_BLOB;
-   ```
+If you prefer to manually install the dependencies or modify them, here’s how:
 
-   - **Memory Management**: We used `LocalFree` to properly free memory allocated by Windows APIs to avoid memory leaks.
-
-### 4. **Build and Linking Errors**
-   We faced several linking errors when trying to build the project for Windows. These errors were related to missing Windows system libraries and functions that were not being resolved.
-
-#### Solution:
-   - **Installing the Correct Toolchain**: We ensured that the correct target (`x86_64-pc-windows-gnu`) was installed using `rustup`.
-   - **Rebuilding the Project**: We fixed all linking issues by running `cargo clean` and rebuilding the project with:
-     ```bash
-     cargo build --target x86_64-pc-windows-gnu
-     ```
-
----
-
-### Final Cross-Compiling Steps
-
-1. **Rust & Cargo**: Ensure you have Rust and Cargo installed on your system. You can install them via `rustup`:
+- **Rust & Cargo**: Install using `rustup`:
     ```bash
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
     source $HOME/.cargo/env
     ```
 
-2. **Target Setup**: Install the necessary toolchain and target for cross-compiling:
+- **GCC for Windows cross-compilation**:
+    ```bash
+    sudo apt-get install gcc-mingw-w64
+    ```
+
+- **Add Windows cross-compilation target**:
     ```bash
     rustup target add x86_64-pc-windows-gnu
     ```
 
-3. **Install Required Libraries**:
-   - **GCC for Windows cross-compilation**:
-     ```bash
-     sudo apt-get install gcc-mingw-w64
-     ```
+- **Optional**: Install Wine to run Windows `.exe` files on Linux:
+    ```bash
+    sudo apt-get install wine
+    ```
 
-4. **Build the Project**:
-   Once the dependencies and libraries are in place, cross-compile the project for Windows by running:
-   ```bash
-   cargo build --target x86_64-pc-windows-gnu
-   ```
+- **Ensure SSH is properly configured for GitHub**:
+    If you don’t have an SSH key, you can generate one:
+    ```bash
+    ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+    eval "$(ssh-agent -s)"
+    ssh-add ~/.ssh/id_rsa
+    ```
 
-   For optimized builds:
-   ```bash
-   cargo build --release --target x86_64-pc-windows-gnu
-   ```
+- **Switch Git Remote to SSH**:
+    ```bash
+    git remote set-url origin git@github.com:nestorwheelock/chromium-based-browsers-secrets-dump-cross-compile.git
+    ```
 
-5. **Running on Windows**:
-   After building, you can transfer the `.exe` file to a Windows system or run it on Linux using Wine:
-   ```bash
-   wine target/x86_64-pc-windows-gnu/release/chromium-password-stealer.exe
-   ```
+---
+
+## Cross-Compiling Steps
+
+Once the dependencies are installed and set up, cross-compile the project by running:
+
+```bash
+cargo build --target x86_64-pc-windows-gnu
+```
+
+For a release build, use:
+
+```bash
+cargo build --release --target x86_64-pc-windows-gnu
+```
+
+You will get a `.exe` file in the `target/x86_64-pc-windows-gnu/release` directory, which can be transferred to a Windows machine or run using Wine:
+
+```bash
+wine target/x86_64-pc-windows-gnu/release/chromium-password-stealer.exe
+```
 
 ---
 
@@ -136,17 +123,23 @@ We installed the following libraries and made the necessary adjustments for cros
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/nestorwheelock/chromium-based-browsers-secrets-dump-cross-compile.git
+git clone git@github.com:nestorwheelock/chromium-based-browsers-secrets-dump-cross-compile.git
 cd chromium-based-browsers-secrets-dump-cross-compile
 ```
 
-2. Build the project:
+2. Run the setup script to install dependencies:
+
+```bash
+./setup_dependencies.sh
+```
+
+3. Build the project:
 
 ```bash
 cargo build --release
 ```
 
-3. Run the project:
+4. Run the project:
 
 ```bash
 cargo run
@@ -179,4 +172,4 @@ The application will automatically search for supported browsers' data directori
 
 ---
 
-This README now includes details about the issues we encountered during cross-compiling, the system libraries we had to install, and how we fixed them to successfully compile the project on a Linux environment for Windows.
+This README now includes detailed setup instructions, including dependency installation using the `setup_dependencies.sh` script, as well as manual steps and solutions to problems encountered during cross-compiling.
