@@ -1,8 +1,11 @@
 
-<div align="center">
-<h1><code>Chromium Based Browsers Secrets Dump</code></h1>
-<p>A Rust application for extracting and decrypting sensitive data from various web browsers' local storage. This tool decrypts saved passwords and other encrypted data using DPAPI and AES-256-GCM, providing insights into browser-stored credentials securely and efficiently.  This was forked from https://github.com/Fastiraz/chromium-based-browsers-secrets-dump as a fun project for something hopefully practical that can be cross-compiled on Linux for Windows.  Made some changes to the libraries to work with the lower level windows-sys crate</p>
-</div>
+### Chromium Based Browsers Secrets Dump
+
+This Rust application is designed to extract and decrypt sensitive data stored in the local storage of various Chromium-based web browsers. It decrypts saved passwords and other encrypted data using DPAPI (on Windows) and AES-256-GCM, providing secure and efficient access to browser-stored credentials.
+
+The idea for this project stemmed from the potential practical use in computer repair and data recovery. It could be a valuable tool for recovering important saved information for clients who have lost access to their computers, helping to retrieve stored secrets to aid in data recovery.
+
+Originally forked from [Fastiraz's Chromium-Based Browsers Secrets Dump](https://github.com/Fastiraz/chromium-based-browsers-secrets-dump), this version focuses on cross-compilation on Linux for Windows. Several changes have been made to work with the lower-level `windows-sys` crate, making it more adaptable for such cross-platform scenarios.
 
 ---
 
@@ -33,19 +36,17 @@ The application works by locating browser data directories, decrypting stored se
 
 We encountered several problems during the process of cross-compiling the application for Windows while working on a Linux environment. Here are the steps we took to resolve these issues:
 
-### 1. **Initial Setup and Script**
+### 1. **Initial Setup and Precompiled Dependency Manager**
 
-We have created a Bash script called `setup_dependencies.sh` to ensure all necessary dependencies and configurations are handled, from installing system libraries, setting up Rust and Cargo, to configuring SSH for GitHub access.
+Previously, we used a Bash script for managing dependencies, but now we have rewritten the setup process in Rust. This Rust program (`setup_dependencies.rs`) ensures that all required dependencies are installed before building or cross-compiling the project. A precompiled binary version of this dependency manager has been included in the distribution for easier setup.
 
-To run the setup, simply execute the script:
+To use the precompiled binary, simply run:
 
 ```bash
-chmod +x setup_dependencies.sh
-./setup_dependencies.sh
+./setup_dependencies
 ```
 
-The script performs the following:
-
+This binary performs the following tasks:
 1. **Rust & Cargo**: Installs Rust and Cargo, the Rust build system.
 2. **Target Setup**: Installs the necessary `x86_64-pc-windows-gnu` target for Windows cross-compilation.
 3. **System Libraries**:
@@ -127,10 +128,10 @@ git clone git@github.com:nestorwheelock/chromium-based-browsers-secrets-dump-cro
 cd chromium-based-browsers-secrets-dump-cross-compile
 ```
 
-2. Run the setup script to install dependencies:
+2. Run the precompiled setup binary to install dependencies:
 
 ```bash
-./setup_dependencies.sh
+./setup_dependencies
 ```
 
 3. Build the project:
@@ -169,7 +170,3 @@ The application will automatically search for supported browsers' data directori
 - Yandex
 - Brave Browser
 - Iridium
-
----
-
-This README now includes detailed setup instructions, including dependency installation using the `setup_dependencies.sh` script, as well as manual steps and solutions to problems encountered during cross-compiling.
