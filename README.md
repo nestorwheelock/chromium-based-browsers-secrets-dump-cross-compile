@@ -1,7 +1,7 @@
 
 <div align="center">
 <h1><code>Chromium Based Browsers Secrets Dump</code></h1>
-<p>A Rust application for extracting and decrypting sensitive data from various web browsers' local storage. This tool decrypts saved passwords and other encrypted data using DPAPI and AES-256-GCM, providing insights into browser-stored credentials securely and efficiently.</p>
+<p>A Rust application for extracting and decrypting sensitive data from various web browsers' local storage. This tool decrypts saved passwords and other encrypted data using DPAPI and AES-256-GCM, providing insights into browser-stored credentials securely and efficiently.  This was forked from https://github.com/Fastiraz/chromium-based-browsers-secrets-dump as a fun project for something hopefully practical that can be cross-compiled on Linux for Windows.  Made some changes to the libraries to work with the lower level windows-sys crate</p>
 </div>
 
 ---
