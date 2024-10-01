@@ -1,13 +1,16 @@
 
 # Cross-Compiling Rust Applications: A Journey of Refactoring, Debugging, and Triumph
 
+**By Nestor Wheelock**  
+You can find the code for this project in my GitHub repository: [Chromium-Based Browsers Secrets Dump Cross-Compile](https://github.com/nestorwheelock/chromium-based-browsers-secrets-dump-cross-compile). Feel free to contribute or provide feedback!
+
 Cross-compiling is an essential skill for developers, especially when you need to develop applications for platforms other than your primary development environment. As a Rust developer, I recently embarked on a project to take a Rust application that extracts sensitive data from various Chromium-based browsers, and cross-compile it for Windows, even though my development environment was Linux. What followed was a journey of troubleshooting, debugging, and learning that I’m excited to share with you.
 
 In this article, I’ll break down the challenges I faced and the solutions I found, including refactoring the original codebase, swapping libraries, and configuring system dependencies. Along the way, I’ll emphasize the importance of flexibility and resilience in software development, especially when cross-compiling code.
 
 ## The Initial Fork
 
-The project I was working on was a fork of a Rust application designed to extract and decrypt sensitive data, such as passwords and credit card information, stored in browsers like Google Chrome, Brave, and Microsoft Edge. The original project worked on Windows by utilizing the Windows Data Protection API (DPAPI) and AES-256-GCM for decryption. The goal was to make it cross-compile on Linux for Windows, which is especially useful for developers who may not always have access to a Windows machine or want to deploy cross-platform builds automatically.
+The project I was working on was a fork of a Rust application designed to extract and decrypt sensitive data, such as passwords and credit card information, stored in browsers like Google Chrome, Brave, and Microsoft Edge. The original project worked on Windows by utilizing the Windows Data Protection API (DPAPI) and AES-256-GCM for decryption. The goal was to make it cross-compile on Linux for Windows, which is especially useful for developers who may not always have access to a Windows machine or want ...
 
 I forked the project from [Fastiraz's Chromium-Based Browsers Secrets Dump](https://github.com/Fastiraz/chromium-based-browsers-secrets-dump) and started making some necessary adjustments. But as with most development journeys, the challenges soon started cropping up.
 
@@ -37,61 +40,68 @@ After swapping the libraries, I encountered a new set of errors, primarily aroun
 
 ## Refactoring the Code
 
-With the `windows-sys` crate, I had to refactor much of the original code to ensure compatibility. For instance, I had to redefine some structs and functions manually since `windows-sys` does not provide as much abstraction as `winapi`. For example, I had to redefine the `DATA_BLOB` struct myself and ensure that function pointers were passed correctly for system calls like `CryptUnprotectData`.
+With the `windows-sys` crate, I had to refactor much of the original code to ensure compatibility. For instance, I had to redefine some structs and functions manually since `windows-sys` lacks some of the higher-level abstractions found in `winapi`.
 
-The code went from high-level and straightforward, using abstractions, to much more granular and low-level. This is a good example of how sometimes we have to trade convenience for flexibility, especially when dealing with system-level APIs across platforms.
+Here’s an example of the refactored code where I manually defined a `DATA_BLOB` struct:
 
-## System Dependencies
+```rust
+type DATA_BLOB = CRYPT_INTEGER_BLOB;
 
-Cross-compiling from Linux to Windows also required the installation of several system libraries. For this, I had to ensure the correct toolchain was available and that system dependencies like `gcc-mingw-w64` were properly configured. I also needed to set up Wine to run the resulting Windows executables for testing directly from my Linux environment.
+fn decrypt_data(encrypted_data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut blob_in = DATA_BLOB {
+        cbData: encrypted_data.len() as u32,
+        pbData: encrypted_data.as_ptr() as *mut u8,
+    };
+    let mut blob_out = DATA_BLOB {
+        cbData: 0,
+        pbData: std::ptr::null_mut(),
+    };
 
-Here’s a list of the key dependencies I had to ensure were installed:
+    let result = unsafe {
+        CryptUnprotectData(
+            &mut blob_in as *mut _,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0,
+            &mut blob_out as *mut _,
+        )
+    };
 
-1. **Rust and Cargo**: Rust’s package manager and build system.
-2. **gcc-mingw-w64**: The cross-compilation toolchain for Windows on Linux.
-3. **Wine**: Optional, but useful for running Windows binaries directly on Linux.
-4. **SSH key setup**: Ensuring smooth access to repositories via Git.
-
-I realized that these steps could be automated, so I wrote a script (which I later refactored into a Rust program) to automatically install all these dependencies.
-
-## Debugging the Errors
-
-Even after switching the libraries and installing the necessary dependencies, there were still plenty of bugs and errors to work through. Some of these were related to how the Windows system APIs behaved differently when invoked through cross-compilation. Others were related to simple typographical errors in the code, like missing semicolons or unclosed delimiters.
-
-One recurring error I faced was related to function signatures. In cross-compilation, it’s essential to ensure that all system calls conform to the expected function signatures for the target platform. Misalignment here led to cryptic runtime errors and crashes.
-
-Here’s an example of one such error and how I debugged it:
-
-```bash
-error[E0606]: casting `&mut DATA_BLOB` as `*mut CRYPT_INTEGER_BLOB` is invalid
-  --> src/main.rs:31:13
-   |
-31 |             &mut blob_in as *mut _,
-   |             ^^^^^^^^^^^^^^^^^^^^^^
+    if result != 0 {
+        let decrypted_data = unsafe {
+            std::slice::from_raw_parts(blob_out.pbData, blob_out.cbData as usize).to_vec()
+        };
+        unsafe { LocalFree(blob_out.pbData as *mut _); }
+        Ok(decrypted_data)
+    } else {
+        Err("Decryption failed".into())
+    }
+}
 ```
 
-To fix this, I had to ensure that my manual struct definitions aligned exactly with the Windows API’s expected types. This is one of the critical aspects of working with system-level APIs when cross-compiling: precision is key.
+## System Dependencies and Environment Setup
 
-## Automating the Setup
+To ensure that everything worked seamlessly, I had to install several system dependencies on my Linux machine. This included tools like `mingw-w64` for cross-compiling Windows binaries and Wine for running the resulting executables directly on Linux.
 
-Once everything was working, I realized that I had gone through a number of steps that other developers might benefit from automating. That’s when I decided to create a `setup_dependencies.rs` script, a Rust version of the initial Bash script I wrote to install all necessary tools, configure the environment, and set up the cross-compilation target. This was later packaged into the distribution as a precompiled binary for ease of use.
+To streamline the process, I wrote a Rust script that automatically installs the required dependencies, checks for the correct targets in Rust, and even configures SSH for pushing code to GitHub. This script, `setup_dependencies.rs`, is included as a precompiled binary in the project, making it easier for others to set up the environment without much hassle.
 
-The Rust version of this dependency manager is cleaner and more portable, especially in a project where Rust is the primary language. It also allowed me to refactor the logic into something that integrated well with Cargo and other Rust tooling.
+Here’s a brief overview of what the script does:
 
-## Final Thoughts: Why Cross-Compiling Matters
+1. **Checks for Rust and Cargo**: If they aren’t installed, it installs them.
+2. **Installs `mingw-w64`**: Ensures the Windows cross-compilation target is configured.
+3. **Configures SSH**: Sets up the SSH keys if they aren’t already configured.
+4. **Switches Git Remote to SSH**: For easier interaction with the repository.
 
-Cross-compiling is not just a nice-to-have—it’s becoming increasingly important in modern software development. Whether you’re building applications for multiple operating systems or deploying cross-platform binaries in CI/CD pipelines, the ability to handle cross-compilation effectively can be a huge asset.
+## The Power of Cross-Compiling
 
-This journey taught me that being able to refactor, debug, and adapt is critical when working across environments. It’s not always enough to get the code running in your local environment; you need to think about where it will be deployed and how the system libraries, APIs, and toolchains will behave in different contexts.
+Cross-compiling is more than just a development convenience—it’s a powerful tool that allows developers to target multiple platforms without having to maintain separate machines or environments. With the right setup, you can write your code once and deploy it across platforms, ensuring maximum reach for your software.
 
-## Conclusion
+For this project, cross-compiling allowed me to continue working from my Linux environment while ensuring that the final application would run smoothly on Windows.
 
-The road to cross-compiling my Rust project was full of challenges, but in the end, it provided valuable insights into system APIs, dependency management, and cross-platform development. It forced me to dive deeper into low-level programming, refactor the code for flexibility, and learn how to manage system dependencies more effectively. 
+## Final Thoughts
 
-For any developer working with Rust or any other systems language, cross-compilation is an invaluable skill that opens up new opportunities, whether you’re working on desktop applications, embedded systems, or server software.
+Refactoring this project for cross-compilation was a rewarding experience that pushed me to learn more about the lower-level system APIs and Rust’s powerful toolchain. The project is now available on my GitHub: [Nestor Wheelock's Chromium-Based Browsers Secrets Dump Cross-Compile](https://github.com/nestorwheelock/chromium-based-browsers-secrets-dump-cross-compile).
 
-So, don’t be afraid to roll up your sleeves, refactor code, and debug obscure errors—it's all part of the process. And in the end, it’s immensely rewarding to watch your project run on a completely different platform!
-
----
-
-That was my experience cross-compiling a Rust application from Linux to Windows. If you're facing similar challenges or need a hand, feel free to reach out—let’s keep building!  
+If you’re a developer looking to dive into cross-compilation or refactoring projects, I hope this article provides some useful insights and inspires you to take on similar challenges. Feel free to contribute to the project, and happy coding!
